@@ -1,0 +1,77 @@
+<!--
+	
+                          Copyright 2013  Pegasystems Inc.                           
+                                All rights reserved.                                 
+	This software has been provided pursuant to a License Agreement containing restrictions
+	on its use. The software contains valuable trade secrets and proprietary information of
+	Pegasystems Inc and is protected by federal copyright law.It may not be copied, modified,
+	translated or distributed in any form or medium, disclosed to third parties or used in 
+	any manner not provided for in  said License Agreement except with  written
+	authorization from Pegasystems Inc.
+	-->
+<project name="commonUtilities" xmlns:pega="pega:/pega.com" 
+													xmlns:ac="ac:/antcontrib.org">
+
+	<!--  Finds the system name from pr_data_admin and sets the property 'current.system.name' -->
+	<target name="_findSystemName">
+
+		<condition property="schema.name" value="${data.schema}.">
+			<and>
+				<isset property="data.schema"/>
+				<not>
+					<equals arg1="${data.schema}" arg2="" />
+				</not>
+			</and>
+		</condition>
+		<!-- Query for a system name with requestors -->
+		<property name="system.name.sql" value="select pySetting from ${schema.name}pr_data_admin where pzinskey = 'DATA-ADMIN-SYSTEM-SETTINGS PEGA-ENGINE!PRCONFIG/IDENTIFICATION/SYSTEMNAME/DEFAULT'" />
+		<echo message="${system.name.sql}" />
+		
+	    <pega:sql 
+	    	url="${pega.jdbc.url}" 
+	        user="${pega.jdbc.username}" 
+	        password="${pega.jdbc.password}" 
+	        properties="${database.connection.properties}"
+	        drivers="${pega.jdbc.driver.jar}"
+	        driverclass="${pega.jdbc.driver.class}"
+	        query="${system.name.sql}"
+	        result="current.system.name"/>	
+
+	</target>
+
+	<macrodef name="configurejvmargs">
+		<attribute name="targetProp"/>
+		<attribute name="dbType"/>
+        <attribute name="extraDefaultArgs" default=""/>
+		<sequential>
+
+            <!-- JVM arguments that will be provided to each forked Java process -->
+            <local name="jvm.arg.mem.max.temp" />
+			<condition property="jvm.arg.mem.max.temp" value="${jvm.arg.mem.max}" else="-Xmx4g">
+				<isset property="jvm.arg.mem.max"/>
+			</condition>
+
+			<local name="use.dev.urandom" />
+			<condition property="use.dev.urandom" value="-Djava.security.egd=file:///dev/urandom" else="">
+				<and>
+					<equals arg1="@{dbType}" arg2="oracledate" />
+					<os family="unix"/>
+				</and>
+			</condition>
+
+            <!-- JVM arguments we want supplied no matter what -->
+            <local name="jvm.arg.required.args" />
+            <property name="jvm.arg.required.args" value="-XX:+HeapDumpOnOutOfMemoryError" />
+
+            <condition property="@{targetProp}" value="${custom.jvm.args} ${use.dev.urandom} ${jvm.arg.required.args}"
+                                                else="${jvm.arg.mem.max.temp} ${use.dev.urandom} ${jvm.arg.required.args} @{extraDefaultArgs}">
+				<isset property="custom.jvm.args"/>
+			</condition>
+
+			<pega:propagatesysprops jvmargs="${@{targetProp}}" />
+
+			<echo message="*** JVM Arguments ${@{targetProp}} ***"/>
+		</sequential>
+	</macrodef>
+
+</project>
